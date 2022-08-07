@@ -1,7 +1,8 @@
 package domain
 
 type RatingRepo interface {
-	addParty(party Party) error
-	saveTeamRatingChanges([]TeamRatingChange) error
-	getTeamRating(team Team) int
+	AddParty(party Party) error
+	SaveTeamRatingChanges([]TeamRatingChange) error
+	GetTeamRating(team Team) int
+	RecalcTeamRating(team Team) error
 }

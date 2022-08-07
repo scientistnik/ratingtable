@@ -3,28 +3,39 @@ package domain
 type GameType int
 
 const (
-	_         GameType = iota
-	ChessGame GameType = iota
+	DefaultGameType GameType = iota
+	ChessGameType   GameType = iota
 )
 
-type Game struct {
+type Game interface {
+	AddParty(party Party) error
+}
+
+type DefaultGame struct {
 	ratingRepo RatingRepo
 }
 
-func (g Game) CalcRatingChanges(party Party) []TeamRatingChange {
+func (g DefaultGame) CalcRatingChanges(party Party) []TeamRatingChange {
 	var teamRatings []TeamRatingChange
 
 	var ratings []int
 	for _, teamPoints := range party.TeamPoints {
-		r := g.ratingRepo.getTeamRating(teamPoints.Team)
+		r := g.ratingRepo.GetTeamRating(teamPoints.Team)
 		ratings = append(ratings, r)
 	}
 
-	one, two := calcEloRating(
+	one := calcEloRating(
 		ratings[0],
+		float64(party.TeamPoints[0].Points),
 		ratings[1],
-		party.TeamPoints[0].Points,
-		party.TeamPoints[1].Points,
+		float64(party.TeamPoints[1].Points),
+		40,
+	)
+	two := calcEloRating(
+		ratings[1],
+		float64(party.TeamPoints[1].Points),
+		ratings[0],
+		float64(party.TeamPoints[0].Points),
 		40,
 	)
 
@@ -34,20 +45,25 @@ func (g Game) CalcRatingChanges(party Party) []TeamRatingChange {
 	return teamRatings
 }
 
-func (g Game) AddParty(party Party) error {
-	err := g.ratingRepo.addParty(party)
+func (g DefaultGame) AddParty(party Party) error {
+	err := g.ratingRepo.AddParty(party)
 	if err != nil {
 		return err
 	}
 
 	teamRatingChanges := g.CalcRatingChanges(party)
 
-	err = g.ratingRepo.saveTeamRatingChanges(teamRatingChanges)
+	err = g.ratingRepo.SaveTeamRatingChanges(teamRatingChanges)
 	if err != nil {
 		return err
 	}
 
-	// TODO: update team ratings
+	for _, teamPoints := range party.TeamPoints {
+		err := g.ratingRepo.RecalcTeamRating(teamPoints.Team)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
