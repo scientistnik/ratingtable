@@ -1,10 +1,12 @@
 package app
 
-import "ratingtable/internal/app/domain"
+import (
+	"ratingtable/internal/app/domain"
+)
 
-type UserRang struct {
+type TeamRang struct {
 	Rang   int
-	User   domain.User
+	Team   domain.Team
 	Rating int
 }
 
@@ -13,8 +15,7 @@ type App struct {
 }
 
 func (a App) CreateGame(name string, gameType domain.GameType) error {
-
-	_, err := a.storage.CreateGame(name, gameType)
+	_, err := a.storage.GameCreate(name, gameType)
 	if err != nil {
 		return err
 	}
@@ -22,38 +23,53 @@ func (a App) CreateGame(name string, gameType domain.GameType) error {
 	return nil
 }
 
-func (a App) GetOrCreateUser(links []string) (*domain.User, error) {
-	return nil, nil
+func (a App) GetOrCreateUser(links map[string]string) (*domain.User, error) {
+	users, err := a.storage.UserFind(UserFilter{Links: links})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(users) == 0 {
+		return a.storage.UserCreate(links)
+	}
+
+	return &users[0], nil
 }
 
-func (a App) AddUserLinks(links []string) error {
+func (a App) AddUserLinks(user domain.User, links map[string]string) error {
+	return a.storage.UserUpdateLinks(user, links)
+}
+
+func (a App) AddTeam(name string, gameID domain.GameID, users []domain.User) (*domain.Team, error) {
+	team, err := a.storage.TeamCreate(name, gameID, users)
+	if err != nil {
+		return nil, err
+	}
+
+	return team, nil
+}
+
+func (a App) AddParty(gameName string, teamsPoints []domain.TeamPoints) error {
+	game, err := a.storage.GameGet(gameName)
+	if err != nil {
+		return err
+	}
+
+	err = game.AddParty(domain.Party{
+		GameID:     game.GetID(),
+		TeamPoints: teamsPoints,
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (a App) AddTeam(name string, gameID int, users []domain.User) (*domain.Team, error) {
-	return nil, nil
+func (a App) GetTableRating(users []domain.User) []TeamRang {
+	return a.storage.GetTableRating()
 }
 
-func (a App) AddUserTeam(team domain.Team, users []domain.User) error {
-	return nil
-}
-
-func (a App) AddParty(party domain.Party) error {
-	return nil
-}
-
-func (a App) AddPartyByLink(link string) error {
-	return nil
-}
-
-func (a App) AddPartyByResultStr(resultStr string) error {
-	return nil
-}
-
-func (a App) GetUsersRating(users []domain.User) []int {
-	return nil
-}
-
-func (a App) GetTableRating() []UserRang {
-	return nil
+func (a App) GetTeamParties(team domain.Team) ([]domain.Party, error) {
+	return a.storage.GetTeamParties(team)
 }

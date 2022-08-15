@@ -7,12 +7,21 @@ const (
 	ChessGameType   GameType = iota
 )
 
-type Game interface {
+type IGame interface {
+	GetID() GameID
 	AddParty(party Party) error
 }
 
 type DefaultGame struct {
+	ID         GameID
+	Name       string
 	ratingRepo RatingRepo
+}
+
+var _ IGame = (*DefaultGame)(nil)
+
+func (g DefaultGame) GetID() GameID {
+	return g.ID
 }
 
 func (g DefaultGame) CalcRatingChanges(party Party) []TeamRatingChange {
@@ -20,7 +29,11 @@ func (g DefaultGame) CalcRatingChanges(party Party) []TeamRatingChange {
 
 	var ratings []int
 	for _, teamPoints := range party.TeamPoints {
-		r := g.ratingRepo.GetTeamRating(teamPoints.Team)
+		r, err := g.ratingRepo.GetTeamRating(teamPoints.Team)
+		if err != nil {
+			return nil
+		}
+
 		ratings = append(ratings, r)
 	}
 
@@ -39,8 +52,8 @@ func (g DefaultGame) CalcRatingChanges(party Party) []TeamRatingChange {
 		40,
 	)
 
-	teamRatings = append(teamRatings, TeamRatingChange{Team: party.TeamPoints[0].Team, RatingChange: one})
-	teamRatings = append(teamRatings, TeamRatingChange{Team: party.TeamPoints[1].Team, RatingChange: two})
+	teamRatings = append(teamRatings, TeamRatingChange{TeamID: party.TeamPoints[0].Team.ID, RatingChange: one, PartyID: party.ID})
+	teamRatings = append(teamRatings, TeamRatingChange{TeamID: party.TeamPoints[1].Team.ID, RatingChange: two, PartyID: party.ID})
 
 	return teamRatings
 }

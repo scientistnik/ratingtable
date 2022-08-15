@@ -2,10 +2,11 @@ package domain
 
 type TeamPoints struct {
 	Team   Team
-	Points int
+	Points float64
 }
 
 type TeamRatingChange struct {
-	Team         Team
+	TeamID       TeamID
+	PartyID      PartyID
 	RatingChange int
 }

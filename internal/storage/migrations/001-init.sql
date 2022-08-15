@@ -1,4 +1,5 @@
 -- +migrate Up
+-- TODO add autoincrement and uniq
 CREATE TABLE IF NOT EXISTS games (
   id INTEGER NOT NULL PRIMARY KEY,
   name TEXT,
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS parties (
   created_at DATETIME
 );
 
-CREATE TABLE IF NOT EXISTS party_team (
+CREATE TABLE IF NOT EXISTS party_teampoints (
   id INTEGER NOT NULL PRIMARY KEY,
   party_id INTEGER REFERENCES parties,
   team_id INTEGER REFERENCES teams,
