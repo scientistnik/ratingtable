@@ -162,7 +162,7 @@ func (s SQLite) GameGet(name string) (domain.IGame, error) {
 		return nil, err
 	}
 
-	return domain.DefaultGame{ID: id, Name: name}, nil
+	return domain.GetGameByType(gameType, s, id, name), nil
 }
 
 func (s SQLite) UserCreate(links map[string]string) (*domain.User, error) {

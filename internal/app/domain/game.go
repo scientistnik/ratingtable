@@ -12,6 +12,15 @@ type IGame interface {
 	AddParty(party Party) error
 }
 
+func GetGameByType(gameType GameType, ratingRepo RatingRepo, id GameID, name string) IGame {
+	switch gameType {
+	default:
+		return nil
+	case DefaultGameType:
+		return DefaultGame{ratingRepo: ratingRepo, ID: id, Name: name}
+	}
+}
+
 type DefaultGame struct {
 	ID         GameID
 	Name       string
