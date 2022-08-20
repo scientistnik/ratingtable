@@ -26,5 +26,5 @@ type Storage interface {
 	PartyCreate(gameID domain.GameID, teamPoints []domain.TeamPoints) (*domain.Party, error)
 
 	// Rating
-	GetTableRating() []TeamRang
+	GetTableRating() ([]TeamRang, error)
 }

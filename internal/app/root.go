@@ -14,6 +14,10 @@ type App struct {
 	storage Storage
 }
 
+func NewApp(storage Storage) *App {
+	return &App{storage: storage}
+}
+
 func (a App) CreateGame(name string, gameType domain.GameType) error {
 	_, err := a.storage.GameCreate(name, gameType)
 	if err != nil {
@@ -66,7 +70,7 @@ func (a App) AddParty(gameName string, teamsPoints []domain.TeamPoints) error {
 	return nil
 }
 
-func (a App) GetTableRating(users []domain.User) []TeamRang {
+func (a App) GetTableRating(users []domain.User) ([]TeamRang, error) {
 	return a.storage.GetTableRating()
 }
 

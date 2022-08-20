@@ -2,11 +2,15 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"ratingtable/internal/app"
 	"ratingtable/internal/app/domain"
+	"strings"
+
+	_ "github.com/mattn/go-sqlite3"
 
 	packr "github.com/gobuffalo/packr/v2"
 	migrate "github.com/rubenv/sql-migrate"
@@ -127,6 +131,7 @@ func (s SQLite) GetTeamRating(team domain.Team) (int, error) {
 }
 
 func (s SQLite) RecalcTeamRating(team domain.Team) error {
+	// TODO
 	return nil
 }
 
@@ -166,29 +171,194 @@ func (s SQLite) GameGet(name string) (domain.IGame, error) {
 }
 
 func (s SQLite) UserCreate(links map[string]string) (*domain.User, error) {
-	return nil, nil
+	linksJson, err := json.Marshal(links)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.db.Exec("INSERT INTO users (links) VALUES (?)", linksJson)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	return &domain.User{ID: domain.UserID(id)}, nil
 }
 
 func (s SQLite) UserFind(filter app.UserFilter) ([]domain.User, error) {
-	return nil, nil
+	var predicats []string
+
+	if filter.Links != nil {
+		var linkPredicats []string
+
+		for key, value := range filter.Links {
+			linkPredicats = append(linkPredicats, fmt.Sprintf("json_extract(links,'%s') = '%s'", key, value))
+		}
+
+		predicats = append(predicats, "("+strings.Join(linkPredicats, " or ")+")")
+	}
+
+	rows, err := s.db.Query("SELECT id from users where " + strings.Join(predicats, " and "))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []domain.User
+
+	for rows.Next() {
+		var user domain.User
+		err = rows.Scan(&user.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		users = append(users, user)
+	}
+
+	return users, nil
 }
 
 func (s SQLite) UserUpdateLinks(user domain.User, links map[string]string) error {
+	rows, err := s.db.Query("SELECT links FROM users WHERE id = ?", user.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return fmt.Errorf("not found user(id=%d)", user.ID)
+	}
+
+	var currLinks map[string]string
+	err = rows.Scan(&currLinks)
+	if err != nil {
+		return err
+	}
+
+	for key, value := range links {
+		currLinks[key] = value
+	}
+
+	_, err = s.db.Exec("UPDATE users set links = ? WHERE id = ?", currLinks, user.ID)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (s SQLite) TeamCreate(name string, gameID domain.GameID, users []domain.User) (*domain.Team, error) {
-	return nil, nil
+	result, err := s.db.Exec("INSERT INTO teams (name, game_id) VALUES (?,?)", name, gameID)
+	if err != nil {
+		return nil, err
+	}
+
+	teamID, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	var values []any
+	var query []string
+	for _, user := range users {
+		query = append(query, "(?,?)")
+		values = append(values, user.ID, teamID)
+	}
+
+	_, err = s.db.Exec("INSERT INTO user_team (user_id, team_id) VALUES "+strings.Join(query, ","), values...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.Team{ID: domain.TeamID(teamID), Name: name, Users: users}, nil
 }
 
 func (s SQLite) GetTeamParties(team domain.Team) ([]domain.Party, error) {
-	return nil, nil
+	// TODO: select all teams in party
+	rows, err := s.db.Query("SELECT p.id, p.game_id, p.created_at, ptp.points FROM parties as p "+
+		"JOIN party_teampoints as ptp ON p.id = ptp.party_id "+
+		"WHERE ptp.team_id = ? "+
+		"ORDER BY p.created_at DESC",
+		team.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var parties []domain.Party
+	for rows.Next() {
+		var party domain.Party
+		var date string
+		var points float64
+
+		err = rows.Scan(&party.ID, &party.GameID, &date, &points)
+		if err != nil {
+			return nil, err
+		}
+
+		party.TeamPoints = append(party.TeamPoints, domain.TeamPoints{Team: team, Points: points})
+
+		parties = append(parties, party)
+	}
+
+	return parties, nil
 }
 
 func (s SQLite) PartyCreate(gameID domain.GameID, teamPoints []domain.TeamPoints) (*domain.Party, error) {
-	return nil, nil
+	result, err := s.db.Exec("INSERT INTO parties (game_id) VALUES (?)", gameID)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	var values []any
+	var query []string
+	for _, teamPoint := range teamPoints {
+		query = append(query, "(?,?,?)")
+		values = append(values, id, teamPoint.Team.ID, teamPoint.Points)
+	}
+
+	_, err = s.db.Exec("INSERT INTO party_teampoints (party_id, team_id, points) VALUES "+strings.Join(query, ","), values...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.Party{ID: domain.PartyID(id), GameID: gameID, TeamPoints: teamPoints}, nil
 }
 
-func (s SQLite) GetTableRating() []app.TeamRang {
-	return nil
+func (s SQLite) GetTableRating() ([]app.TeamRang, error) {
+	// TODO: join team data
+	rows, err := s.db.Query("SELECT team_id, rating FROM ratings ORDER BY rating DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teamRangs []app.TeamRang
+	rang := 0
+
+	for rows.Next() {
+		rang++
+
+		var team domain.Team
+		var rating int
+
+		err = rows.Scan(&team.ID, &rating)
+		if err != nil {
+			return nil, err
+		}
+
+		teamRangs = append(teamRangs, app.TeamRang{Rang: rang, Team: team, Rating: rating})
+	}
+
+	return teamRangs, nil
 }

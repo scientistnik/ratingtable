@@ -10,6 +10,7 @@ type TeamID int
 
 type Team struct {
 	ID    TeamID
+	Name  string
 	Users []User
 }
 
