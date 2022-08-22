@@ -1,12 +1,28 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"ratingtable/internal/app"
 	"ratingtable/internal/storage"
+	"ratingtable/internal/telegram"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Error loading .env file")
+		return
+	}
+
+	telegramToken := os.Getenv("TELEGRAM_TOKEN")
+
 	store, err := storage.NewSQLiteStorage("database.db")
 	if err != nil {
 		fmt.Printf("error in create store instance: %s", err.Error())
@@ -32,4 +48,13 @@ func main() {
 	}
 
 	fmt.Printf("%#v", user)
+
+	telegram.NewTelegram(telegramToken).Launch(ctx, application)
+
+	cancelCannel := make(chan os.Signal, 1)
+	signal.Notify(cancelCannel, os.Interrupt)
+
+	<-cancelCannel
+
+	cancel()
 }
