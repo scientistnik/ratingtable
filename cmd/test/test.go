@@ -49,12 +49,14 @@ func main() {
 
 	fmt.Printf("%#v", user)
 
-	telegram.NewTelegram(telegramToken).Launch(ctx, application)
+	go telegram.NewTelegram(telegramToken).Launch(ctx, application)
 
 	cancelCannel := make(chan os.Signal, 1)
 	signal.Notify(cancelCannel, os.Interrupt)
 
 	<-cancelCannel
+
+	fmt.Print("Finish signal!!!")
 
 	cancel()
 }

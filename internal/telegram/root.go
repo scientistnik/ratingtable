@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"ratingtable/internal/app"
 	"ratingtable/internal/app/domain"
+	"strconv"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -60,12 +62,31 @@ func (t Telegram) Launch(ctx context.Context, app *app.App) error {
 					msg.Text = "I understand /start and /status."
 				case "status":
 					msg.Text = "I'm ok."
-				case "party":
-					msg.Text = "saved"
-					fmt.Printf("[PARTY] %#v", update.Message)
+				case "add_team":
+					msg.Text = "Yes"
+					data := strings.Split(update.Message.Text, " ")[1:]
+					gameName := data[0]
+					teamName := data[1]
+
+					users := []domain.User{}
+					for _, userName := range data[2:] {
+
+					}
+
+				case "add_party":
+					fmt.Printf("[PARTY COMMAND] %#v\n", update.Message.From.ID)
+					userID := update.Message.From.ID
+					user, err := app.GetOrCreateUser(map[string]string{"telegram": strconv.Itoa(int(userID))})
+
+					if err != nil {
+						msg.Text = err.Error()
+						break
+					}
 					//update.Message.Text // "party"
 					//app.TeamGet()
-					app.AddParty("chess", []domain.TeamPoints{})
+					//app.AddParty("chess", []domain.TeamPoints{})
+
+					msg.Text = "saved"
 				default:
 					msg.Text = "I don't know that command"
 				}

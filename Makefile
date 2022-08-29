@@ -5,7 +5,10 @@ tests: mockgen
 	go test ./... -test.v
 
 build:
-	go  build -o build/test -tags json1 cmd/test/test.go 
+	go build -o build/test -tags json1 cmd/test/test.go 
 
 clean:
 	rm -rf build
+
+run:
+	nodemon --signal SIGHUP --exec go run -tags json1 cmd/test/test.go
